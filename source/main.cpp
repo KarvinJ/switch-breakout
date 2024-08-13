@@ -1,4 +1,3 @@
-#include <time.h>
 #include <unistd.h>
 
 #include <SDL.h>
@@ -6,6 +5,7 @@
 #include <SDL_image.h>
 #include <SDL_ttf.h>
 #include <switch.h>
+#include <vector>
 #include "sdl_starter.h"
 #include "sdl_assets_loader.h"
 
@@ -15,54 +15,74 @@ SDL_GameController *controller = nullptr;
 
 bool isGamePaused = false;
 int shouldCloseTheGame = 0;
-int trail = 0;
-int wait = 15;
-
-Sprite playerSprite;
-Sprite switchlogoSprite;
-
-const int PLAYER_SPEED = 600;
-
-int logoVelocityX = 250;
-int logoVelocityY = 250;
-
-int colorIndex = 0;
-int soundIndex = 0;
-
-Mix_Music *music = nullptr;
-Mix_Chunk *sounds[4] = {nullptr};
 
 SDL_Texture *pauseGameTexture = nullptr;
 SDL_Rect pauseGameBounds;
 
-SDL_Color colors[] = {
-    {128, 128, 128, 0}, // gray
-    {255, 255, 255, 0}, // white
-    {255, 0, 0, 0},     // red
-    {0, 255, 0, 0},     // green
-    {0, 0, 255, 0},     // blue
-    {255, 255, 0, 0},   // brown
-    {0, 255, 255, 0},   // cyan
-    {255, 0, 255, 0},   // purple
-};
+TTF_Font *font = nullptr;
+
+SDL_Texture *scoreTexture = nullptr;
+SDL_Rect scoreBounds;
+
+SDL_Texture *liveTexture = nullptr;
+SDL_Rect liveBounds;
+
+Mix_Chunk *collisionSound = nullptr;
+Mix_Chunk *collisionWithPlayerSound = nullptr;
+
+SDL_Rect player = {SCREEN_WIDTH / 2, SCREEN_HEIGHT - 32, 74, 16};
+
+int playerScore;
+int playerLives = 2;
+
+SDL_Rect ball = {SCREEN_WIDTH / 2 - 20, SCREEN_HEIGHT / 2 - 20, 20, 20};
+
+int playerSpeed = 800;
+int ballVelocityX = 425;
+int ballVelocityY = 425;
+
+bool isAutoPlayMode = false;
+
+typedef struct
+{
+    SDL_Rect bounds;
+    bool isDestroyed;
+    int points;
+} Brick;
+
+std::vector<Brick> createBricks()
+{
+    std::vector<Brick> bricks;
+
+    int brickPoints = 10;
+    int positionX;
+    int positionY = 50;
+
+    for (int row = 0; row < 10; row++)
+    {
+        positionX = 0;
+
+        for (int column = 0; column < 20; column++)
+        {
+            Brick actualBrick = {{positionX, positionY, 60, 20}, false, brickPoints};
+
+            bricks.push_back(actualBrick);
+            positionX += 64;
+        }
+
+        brickPoints--;
+        positionY += 22;
+    }
+
+    return bricks;
+}
+
+std::vector<Brick> bricks = createBricks();
 
 void quitGame()
 {
-    // clean up your textures when you are done with them
-    SDL_DestroyTexture(switchlogoSprite.texture);
-    SDL_DestroyTexture(pauseGameTexture);
-
-    // stop sounds and free loaded data
     Mix_HaltChannel(-1);
-    Mix_FreeMusic(music);
-
-    for (soundIndex = 0; soundIndex < 4; soundIndex++)
-    {
-        if (sounds[soundIndex])
-        {
-            Mix_FreeChunk(sounds[soundIndex]);
-        }
-    }
+    // Mix_FreeMusic(music);
 
     IMG_Quit();
     Mix_CloseAudio();
@@ -93,113 +113,130 @@ void handleEvents()
             if (event.jbutton.button == JOY_PLUS)
             {
                 isGamePaused = !isGamePaused;
-                Mix_PlayChannel(-1, sounds[0], 0);
+                Mix_PlayChannel(-1, collisionWithPlayerSound, 0);
             }
 
             if (event.jbutton.button == JOY_A)
             {
-                if (wait > 0)
-                    wait--;
-            }
-
-            if (event.jbutton.button == JOY_X)
-            {
-                if (wait < 100)
-                    wait++;
-            }
-
-            if (event.jbutton.button == JOY_B)
-            {
-                trail = !trail;
+                isAutoPlayMode = !isAutoPlayMode;
+                Mix_PlayChannel(-1, collisionSound, 0);
             }
         }
     }
 }
 
-int rand_range(int min, int max)
-{
-    return min + rand() / (RAND_MAX / (max - min + 1) + 1);
-}
-
 void update(float deltaTime)
 {
-    if (SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_DPAD_UP) && playerSprite.textureBounds.y > 0)
+    if (isAutoPlayMode && ball.x < SCREEN_WIDTH - player.w)
     {
-        playerSprite.textureBounds.y -= PLAYER_SPEED * deltaTime;
+        player.x = ball.x;
     }
 
-    else if (SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_DPAD_DOWN) && playerSprite.textureBounds.y < SCREEN_HEIGHT - playerSprite.textureBounds.h)
+    if (SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_DPAD_LEFT) && player.x > 0)
     {
-        playerSprite.textureBounds.y += PLAYER_SPEED * deltaTime;
+        player.x -= playerSpeed * deltaTime;
     }
 
-    else if (SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_DPAD_LEFT) && playerSprite.textureBounds.x > 0)
+    else if (SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_DPAD_RIGHT) && player.x < SCREEN_WIDTH - player.w)
     {
-        playerSprite.textureBounds.x -= PLAYER_SPEED * deltaTime;
+        player.x += playerSpeed * deltaTime;
     }
 
-    else if (SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_DPAD_RIGHT) && playerSprite.textureBounds.x < SCREEN_WIDTH - playerSprite.textureBounds.w)
+    if (ball.y > SCREEN_HEIGHT + ball.h)
     {
-        playerSprite.textureBounds.x += PLAYER_SPEED * deltaTime;
+        ball.x = SCREEN_WIDTH / 2 - ball.w;
+        ball.y = SCREEN_HEIGHT / 2 - ball.h;
+
+        ballVelocityX *= -1;
+
+        if (playerLives > 0)
+        {
+            playerLives--;
+
+            // std::string livesString = "lives: " + std::to_string(playerLives);
+
+            // updateTextureText(liveTexture, livesString.c_str(), font, renderer);
+        }
     }
 
-    if (SDL_HasIntersection(&playerSprite.textureBounds, &switchlogoSprite.textureBounds))
+    if (ball.x < 0 || ball.x > SCREEN_WIDTH - ball.w)
     {
-        logoVelocityX *= -1;
-        logoVelocityY *= -1;
-
-        colorIndex = rand_range(0, 4);
-        soundIndex = rand_range(0, 3);
-
-        Mix_PlayChannel(-1, sounds[soundIndex], 0);
+        ballVelocityX *= -1;
+        Mix_PlayChannel(-1, collisionSound, 0);
     }
 
-    if (switchlogoSprite.textureBounds.x + switchlogoSprite.textureBounds.w > SCREEN_WIDTH || switchlogoSprite.textureBounds.x < 0)
+    if (SDL_HasIntersection(&player, &ball) || ball.y < 0)
     {
-        logoVelocityX *= -1;
-        colorIndex = rand_range(0, 4);
-        soundIndex = rand_range(0, 3);
-
-        Mix_PlayChannel(-1, sounds[soundIndex], 0);
+        ballVelocityY *= -1;
+        Mix_PlayChannel(-1, collisionWithPlayerSound, 0);
     }
 
-    if (switchlogoSprite.textureBounds.y + switchlogoSprite.textureBounds.h > SCREEN_HEIGHT || switchlogoSprite.textureBounds.y < 0)
+    for (auto actualBrick = bricks.begin(); actualBrick != bricks.end();)
     {
-        logoVelocityY *= -1;
-        colorIndex = rand_range(0, 4);
-        soundIndex = rand_range(0, 3);
+        if (!actualBrick->isDestroyed && SDL_HasIntersection(&actualBrick->bounds, &ball))
+        {
+            ballVelocityY *= -1;
+            actualBrick->isDestroyed = true;
 
-        Mix_PlayChannel(-1, sounds[soundIndex], 0);
+            playerScore += actualBrick->points;
+            
+            // its failing
+
+            // std::string scoreString = "score: " + std::to_string(playerScore);
+
+            // updateTextureText(scoreTexture, scoreString.c_str(), font, renderer);
+
+            Mix_PlayChannel(-1, collisionSound, 0);
+        }
+
+        if (actualBrick->isDestroyed)
+        {
+            bricks.erase(actualBrick);
+        }
+        else
+        {
+            actualBrick++;
+        }
     }
 
-    // set position and bounce on the walls
-    switchlogoSprite.textureBounds.x += logoVelocityX * deltaTime;
-    switchlogoSprite.textureBounds.y += logoVelocityY * deltaTime;
-}
-
-void renderSprite(Sprite sprite)
-{
-    SDL_RenderCopy(renderer, sprite.texture, NULL, &sprite.textureBounds);
+    ball.x += ballVelocityX * deltaTime;
+    ball.y += ballVelocityY * deltaTime;
 }
 
 void render()
 {
-    if (!trail)
-    {
-        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0xFF);
-        SDL_RenderClear(renderer);
-    }
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+    SDL_RenderClear(renderer);
 
-    SDL_SetTextureColorMod(switchlogoSprite.texture, colors[colorIndex].r, colors[colorIndex].g, colors[colorIndex].b);
-    renderSprite(switchlogoSprite);
+    SDL_QueryTexture(scoreTexture, NULL, NULL, &scoreBounds.w, &scoreBounds.h);
+    scoreBounds.x = 300;
+    scoreBounds.y = scoreBounds.h / 2 - 10;
+    SDL_RenderCopy(renderer, scoreTexture, NULL, &scoreBounds);
 
-    renderSprite(playerSprite);
+    SDL_QueryTexture(liveTexture, NULL, NULL, &liveBounds.w, &liveBounds.h);
+    liveBounds.x = 800;
+    liveBounds.y = liveBounds.h / 2 - 10;
+    SDL_RenderCopy(renderer, liveTexture, NULL, &liveBounds);
 
     if (isGamePaused)
     {
-        // put text on screen
         SDL_RenderCopy(renderer, pauseGameTexture, NULL, &pauseGameBounds);
     }
+
+    SDL_SetRenderDrawColor(renderer, 0, 255, 255, 255);
+
+    for (Brick brick : bricks)
+    {
+        if (!brick.isDestroyed)
+        {
+            SDL_RenderFillRect(renderer, &brick.bounds);
+        }
+    }
+
+    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+
+    SDL_RenderFillRect(renderer, &player);
+    SDL_RenderFillRect(renderer, &ball);
 
     SDL_RenderPresent(renderer);
 }
@@ -229,33 +266,32 @@ int main(int argc, char **argv)
         }
     }
 
-    playerSprite = loadSprite(renderer, "data/alien_1.png", SCREEN_WIDTH / 2 - 100, SCREEN_HEIGHT / 2);
-    switchlogoSprite = loadSprite(renderer, "data/switch.png", SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2);
+    font = TTF_OpenFont("data/LeroyLetteringLightBeta01.ttf", 36);
 
-    // load font from romfs
-    TTF_Font *font = TTF_OpenFont("data/LeroyLetteringLightBeta01.ttf", 36);
+    updateTextureText(scoreTexture, "Score: 0", font, renderer);
+    updateTextureText(liveTexture, "Lives: 2", font, renderer);
 
-    // render text as texture
     updateTextureText(pauseGameTexture, "Game Paused", font, renderer);
 
     SDL_QueryTexture(pauseGameTexture, NULL, NULL, &pauseGameBounds.w, &pauseGameBounds.h);
     pauseGameBounds.x = SCREEN_WIDTH / 2 - pauseGameBounds.w / 2;
-    pauseGameBounds.y = 200;
+    pauseGameBounds.y = SCREEN_HEIGHT / 2 - pauseGameBounds.h / 2;
 
     // no need to keep the font loaded
     TTF_CloseFont(font);
 
     // load music and sounds from files
-    sounds[0] = loadSound("data/pop1.wav");
-    sounds[1] = loadSound("data/pop2.wav");
-    sounds[2] = loadSound("data/pop3.wav");
-    sounds[3] = loadSound("data/pop4.wav");
+    // sounds[0] = loadSound("data/pop1.wav");
+    // sounds[1] = loadSound("data/pop2.wav");
+    // sounds[2] = loadSound("data/pop3.wav");
+    // sounds[3] = loadSound("data/pop4.wav");
 
-    music = loadMusic("data/background.ogg");
+    collisionSound = loadSound("data/pop1.wav");
+    collisionWithPlayerSound = loadSound("data/pop2.wav");
 
-    Mix_PlayMusic(music, -1);
+    // music = loadMusic("data/background.ogg");
 
-    srand(time(NULL));
+    // Mix_PlayMusic(music, -1);
 
     Uint32 previousFrameTime = SDL_GetTicks();
     Uint32 currentFrameTime = previousFrameTime;
@@ -277,10 +313,7 @@ int main(int argc, char **argv)
         }
 
         render();
-
-        SDL_Delay(wait);
     }
 
     quitGame();
-    return 0;
 }

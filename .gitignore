@@ -1,4 +1,4 @@
 /build
-sdl-switch-starter.elf
-sdl-switch-starter.nacp
-sdl-switch-starter.nro
+*.elf
+*.nacp
+*.nro
