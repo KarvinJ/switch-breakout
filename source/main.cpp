@@ -153,9 +153,9 @@ void update(float deltaTime)
         {
             playerLives--;
 
-            // std::string livesString = "lives: " + std::to_string(playerLives);
+            std::string livesString = "lives: " + std::to_string(playerLives);
 
-            // updateTextureText(liveTexture, livesString.c_str(), font, renderer);
+            updateTextureText(liveTexture, livesString.c_str(), font, renderer);
         }
     }
 
@@ -180,11 +180,9 @@ void update(float deltaTime)
 
             playerScore += actualBrick->points;
             
-            // its failing
+            std::string scoreString = "score: " + std::to_string(playerScore);
 
-            // std::string scoreString = "score: " + std::to_string(playerScore);
-
-            // updateTextureText(scoreTexture, scoreString.c_str(), font, renderer);
+            updateTextureText(scoreTexture, scoreString.c_str(), font, renderer);
 
             Mix_PlayChannel(-1, collisionSound, 0);
         }
@@ -276,9 +274,6 @@ int main(int argc, char **argv)
     SDL_QueryTexture(pauseGameTexture, NULL, NULL, &pauseGameBounds.w, &pauseGameBounds.h);
     pauseGameBounds.x = SCREEN_WIDTH / 2 - pauseGameBounds.w / 2;
     pauseGameBounds.y = SCREEN_HEIGHT / 2 - pauseGameBounds.h / 2;
-
-    // no need to keep the font loaded
-    TTF_CloseFont(font);
 
     // load music and sounds from files
     // sounds[0] = loadSound("data/pop1.wav");
