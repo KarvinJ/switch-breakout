@@ -1,10 +1,7 @@
-#include <unistd.h>
-
 #include <SDL.h>
 #include <SDL_mixer.h>
 #include <SDL_image.h>
 #include <SDL_ttf.h>
-#include <switch.h>
 #include <vector>
 #include "sdl_starter.h"
 #include "sdl_assets_loader.h"
@@ -13,7 +10,7 @@ SDL_Window *window = nullptr;
 SDL_Renderer *renderer = nullptr;
 SDL_GameController *controller = nullptr;
 
-bool isGamePaused = false;
+bool isGamePaused;
 int shouldCloseTheGame = 0;
 
 SDL_Texture *pauseGameTexture = nullptr;
@@ -34,14 +31,14 @@ SDL_Rect player = {SCREEN_WIDTH / 2, SCREEN_HEIGHT - 32, 74, 16};
 
 int playerScore;
 int playerLives = 2;
+int playerSpeed = 800;
 
 SDL_Rect ball = {SCREEN_WIDTH / 2 - 20, SCREEN_HEIGHT / 2 - 20, 20, 20};
 
-int playerSpeed = 800;
 int ballVelocityX = 425;
 int ballVelocityY = 425;
 
-bool isAutoPlayMode = false;
+bool isAutoPlayMode;
 
 typedef struct
 {
@@ -82,8 +79,6 @@ std::vector<Brick> bricks = createBricks();
 void quitGame()
 {
     Mix_HaltChannel(-1);
-    // Mix_FreeMusic(music);
-
     IMG_Quit();
     Mix_CloseAudio();
     TTF_Quit();
@@ -266,8 +261,8 @@ int main(int argc, char **argv)
 
     font = TTF_OpenFont("data/LeroyLetteringLightBeta01.ttf", 36);
 
-    updateTextureText(scoreTexture, "Score: 0", font, renderer);
-    updateTextureText(liveTexture, "Lives: 2", font, renderer);
+    updateTextureText(scoreTexture, "score: 0", font, renderer);
+    updateTextureText(liveTexture, "lives: 2", font, renderer);
 
     updateTextureText(pauseGameTexture, "Game Paused", font, renderer);
 
@@ -275,18 +270,8 @@ int main(int argc, char **argv)
     pauseGameBounds.x = SCREEN_WIDTH / 2 - pauseGameBounds.w / 2;
     pauseGameBounds.y = SCREEN_HEIGHT / 2 - pauseGameBounds.h / 2;
 
-    // load music and sounds from files
-    // sounds[0] = loadSound("data/pop1.wav");
-    // sounds[1] = loadSound("data/pop2.wav");
-    // sounds[2] = loadSound("data/pop3.wav");
-    // sounds[3] = loadSound("data/pop4.wav");
-
     collisionSound = loadSound("data/pop1.wav");
     collisionWithPlayerSound = loadSound("data/pop2.wav");
-
-    // music = loadMusic("data/background.ogg");
-
-    // Mix_PlayMusic(music, -1);
 
     Uint32 previousFrameTime = SDL_GetTicks();
     Uint32 currentFrameTime = previousFrameTime;
