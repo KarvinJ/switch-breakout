@@ -38,7 +38,7 @@ SDL_Rect ball = {SCREEN_WIDTH / 2 - 20, SCREEN_HEIGHT / 2 - 20, 20, 20};
 int ballVelocityX = 425;
 int ballVelocityY = 425;
 
-bool isAutoPlayMode;
+bool isAutoPlayMode = true;
 
 typedef struct
 {
