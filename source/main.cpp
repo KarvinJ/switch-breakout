@@ -46,6 +46,7 @@ typedef struct
 std::vector<Brick> createBricks()
 {
     std::vector<Brick> bricks;
+    bricks.reserve(200);
 
     int brickPoints = 10;
     int positionX;
@@ -232,7 +233,7 @@ void render()
 
 int main(int argc, char **argv)
 {
-    window = SDL_CreateWindow("sdl2 switch starter", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN);
+    window = SDL_CreateWindow("breakout", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN);
     renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
 
     if (startSDL(window, renderer) > 0)
